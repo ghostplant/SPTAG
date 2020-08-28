@@ -684,7 +684,7 @@ void buildGraphGPU(SPTAG::VectorIndex* index, int dataSize, int KVAL, int trees,
 
   LOG(SPTAG::Helper::LogLevel::LL_Debug, "Alloc'ing memory for results on device: %lld bytes.\n", (long long int)dataSize*KVAL*sizeof(int));
   int* d_results;
-  CUDA_CHECK(cudaMallocManaged(&d_results, (long long int)dataSize*KVAL*sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_results, (long long int)dataSize*KVAL*sizeof(int)));
   // Initialize results to all -1 (special value that is set to distance INFTY)
   CUDA_CHECK(cudaMemset(d_results, -1, (long long int)dataSize*KVAL*sizeof(int)));
 
@@ -829,7 +829,7 @@ void buildGraphGPU_Batch(SPTAG::VectorIndex* index, int dataSize, int KVAL, int 
 
   LOG(SPTAG::Helper::LogLevel::LL_Debug, "Alloc'ing memory for results on device: %lld bytes.\n", (long long int)batchSize*KVAL*sizeof(int));
   int* d_results;
-  CUDA_CHECK(cudaMallocManaged(&d_results, (long long int)batchSize*KVAL*sizeof(int)));
+  CUDA_CHECK(cudaMalloc(&d_results, (long long int)batchSize*KVAL*sizeof(int)));
 
 //  srand(time(NULL)); // random number seed for TP tree random hyperplane partitions
   srand(1); // random number seed for TP tree random hyperplane partitions

@@ -89,6 +89,17 @@ __global__ void compute_mean(KEY_T* split_keys, int* node_sizes, int num_nodes) 
     }
 }
 
+namespace {
+__global__ void clean_leaf_size(LeafNode* leafs) {
+    leafs[blockIdx.x].size=0;
+}
+
+__global__ void accumulate_leaf(LeafNode* leafs, int num_leaves) {
+    leafs[0].offset=0;
+    for(int i=1; i<num_leaves; ++i)
+        leafs[i].offset = leafs[i-1].offset+leafs[i-1].size;
+}
+}
 
 /************************************************************************************
  * Definition of the GPU TPtree structure. 
@@ -129,7 +140,7 @@ class TPtree {
       levels = levels_;
       num_leaves = pow(2,levels);
 
-      cudaMallocManaged(&node_ids, (N)*sizeof(int));
+      cudaMalloc(&node_ids, (N)*sizeof(int));
       cudaMemset(node_ids, 0, N*sizeof(int));
       tree_mem+= N*sizeof(int);
 
@@ -148,13 +159,13 @@ class TPtree {
       tree_mem+= levels*sizeof(int*) + levels*Dim*sizeof(KEY_T);
 
       tree_mem+= N*sizeof(int);
-      cudaMallocManaged(&node_sizes, num_nodes*sizeof(int));
+      cudaMalloc(&node_sizes, num_nodes*sizeof(int));
       cudaMemset(node_sizes, 0, num_nodes*sizeof(int));
 
       cudaMallocManaged(&split_keys, num_internals*sizeof(KEY_T));
       tree_mem+= num_nodes*sizeof(int) + num_internals*sizeof(KEY_T);
 
-      cudaMallocManaged(&leafs, num_leaves*sizeof(LeafNode));
+      cudaMalloc(&leafs, num_leaves*sizeof(LeafNode));
       tree_mem+=num_leaves*sizeof(LeafNode);
 
       cudaMalloc(&leaf_points, N*sizeof(int));
@@ -170,9 +181,7 @@ class TPtree {
       cudaMemset(node_ids, 0, N*sizeof(int));
       cudaMemset(node_sizes, 0, num_nodes*sizeof(int));
       cudaMemset(split_keys, 0.0, num_nodes*sizeof(float));
-      for(int i=0; i<num_leaves; ++i) {
-        leafs[i].size=0;
-      }
+      clean_leaf_size<<<num_leaves, 1>>>(leafs);
     }
 
     __host__ void destroy() {
@@ -212,15 +221,9 @@ class TPtree {
         nodes_on_level*=2;
       }
       count_leaf_sizes<<<BLOCKS,THREADS>>>(leafs, node_ids, N, num_nodes-num_leaves);
-      cudaDeviceSynchronize();
 
-
-      leafs[0].offset=0;
-      for(int i=1; i<num_leaves; ++i) {
-        leafs[i].offset = leafs[i-1].offset+leafs[i-1].size;
-      } 
-      for(int i=0; i<num_leaves; ++i)
-        leafs[i].size=0;
+      accumulate_leaf<<<1, 1>>>(leafs, num_leaves);
+      clean_leaf_size<<<num_leaves, 1>>>(leafs);
 
 //      assign_leaf_points<<<BLOCKS,THREADS>>>(leafs, leaf_points, node_ids, N, num_nodes-num_leaves);
       assign_leaf_points_in_batch<<<BLOCKS,THREADS>>>(leafs, leaf_points, node_ids, N, num_nodes-num_leaves, min_id, max_id);
@@ -232,10 +235,13 @@ class TPtree {
     // For debugging purposes
     ************************************************************************************/
     __host__ void print_tree(Point<T,SUMTYPE,Dim>* points) {
+      std::vector<int> h_node_sizes(num_nodes);
+      cudaMemcpyAsync(h_node_sizes.data(), node_sizes, sizeof(int) * num_nodes, cudaMemcpyDeviceToHost, 0);
+      cudaDeviceSynchronize();
       printf("nodes:%d, leaves:%d, levels:%d\n", num_nodes, num_leaves, levels);
       for(int i=0; i<levels; ++i) {
         for(int j=0; j<pow(2,i); ++j) {
-          printf("(%d) %0.2f, ", node_sizes[(int)pow(2,i)+j-1], split_keys[(int)pow(2,i)+j-1]);
+          printf("(%d) %0.2f, ", h_node_sizes[(int)pow(2,i)+j-1], split_keys[(int)pow(2,i)+j-1]);
         }
         printf("\n");
       }
