@@ -162,7 +162,7 @@ class TPtree {
       cudaMalloc(&node_sizes, num_nodes*sizeof(int));
       cudaMemset(node_sizes, 0, num_nodes*sizeof(int));
 
-      cudaMallocManaged(&split_keys, num_internals*sizeof(KEY_T));
+      cudaMalloc(&split_keys, num_internals*sizeof(KEY_T));
       tree_mem+= num_nodes*sizeof(int) + num_internals*sizeof(KEY_T);
 
       cudaMalloc(&leafs, num_leaves*sizeof(LeafNode));
@@ -236,12 +236,14 @@ class TPtree {
     ************************************************************************************/
     __host__ void print_tree(Point<T,SUMTYPE,Dim>* points) {
       std::vector<int> h_node_sizes(num_nodes);
+      std::vector<KEY_T> h_split_keys(num_nodes - num_leaves);
       cudaMemcpyAsync(h_node_sizes.data(), node_sizes, sizeof(int) * num_nodes, cudaMemcpyDeviceToHost, 0);
+      cudaMemcpyAsync(h_split_keys.data(), split_keys, sizeof(KEY_T) * h_split_keys.size(), cudaMemcpyDeviceToHost, 0);
       cudaDeviceSynchronize();
       printf("nodes:%d, leaves:%d, levels:%d\n", num_nodes, num_leaves, levels);
       for(int i=0; i<levels; ++i) {
         for(int j=0; j<pow(2,i); ++j) {
-          printf("(%d) %0.2f, ", h_node_sizes[(int)pow(2,i)+j-1], split_keys[(int)pow(2,i)+j-1]);
+          printf("(%d) %0.2f, ", h_node_sizes[(int)pow(2,i)+j-1], h_split_keys[(int)pow(2,i)+j-1]);
         }
         printf("\n");
       }
