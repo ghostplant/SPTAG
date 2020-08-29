@@ -151,9 +151,9 @@ class TPtree {
       tree_mem+=Dim*sizeof(int);
 
       // Allocate memory for TOT_PART_DIMS weights at each level
-      cudaMallocManaged(&weight_list, levels*sizeof(KEY_T*));
+      weight_list = new KEY_T*[levels];
       for(int i=0; i<levels; ++i) {
-        cudaMallocManaged(&weight_list[i], Dim*sizeof(KEY_T));
+        cudaMalloc(&weight_list[i], Dim*sizeof(KEY_T));
       }
 
       tree_mem+= levels*sizeof(int*) + levels*Dim*sizeof(KEY_T);
@@ -189,7 +189,7 @@ class TPtree {
       for(int i=0; i<levels; ++i) {
         cudaFree(weight_list[i]);
       }
-      cudaFree(weight_list);
+      delete []weight_list;
       cudaFree(node_sizes);
       cudaFree(split_keys);
       cudaFree(leafs);
@@ -252,15 +252,18 @@ class TPtree {
 
 template<typename T, typename KEY_T, typename SUMTYPE, int Dim>
 __host__ void create_tptree(TPtree<T,KEY_T,SUMTYPE,Dim>* d_tree, Point<T,SUMTYPE,Dim>* points, int N, int MAX_LEVELS, int min_id, int max_id) {
-
+  std::vector<std::vector<KEY_T>> h_weight_list(d_tree->levels, std::vector<KEY_T>(Dim));
   for(int j=0; j<Dim; ++j) {
-    d_tree->weight_list[0][j] = ((rand()%2)*2)-1;
+    h_weight_list[0][j] = ((rand()%2)*2)-1;
   }
   for(int i=1; i<d_tree->levels; ++i) {
     for(int j=0; j<Dim; ++j) {
-      d_tree->weight_list[i][j] = d_tree->weight_list[0][j] * (((rand()%2)*2)-1);
+      h_weight_list[i][j] = h_weight_list[0][j] * (((rand()%2)*2)-1);
     }
   }
+  for (int i = 0; i < d_tree->levels; ++i)
+    cudaMemcpyAsync(d_tree->weight_list[i], h_weight_list[i].data(), h_weight_list[i].size() * sizeof(KEY_T), cudaMemcpyHostToDevice, 0);
+  cudaDeviceSynchronize();
   
   d_tree->construct_tree(points, min_id, max_id);
 }
