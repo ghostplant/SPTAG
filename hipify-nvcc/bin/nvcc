@@ -1,0 +1,37 @@
+#!/usr/bin/python3
+
+import os, sys, time
+import subprocess
+
+if len(sys.argv) <= 1:
+    exit(1)
+
+_backup_args = [v for v in sys.argv]
+
+if '--version' in sys.argv:
+  print('''nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2020 NVIDIA Corporation
+Built on Wed_Jul_22_19:09:09_PDT_2020
+Cuda compilation tools, release 11.0, V11.0.221
+Build cuda_11.0_bu.TC445_37.28845127_0''')
+  exit(0)
+
+#########################################################
+
+args = ['-DGPU', '-fPIC', '-c', '-O2', '-I/usr/local/cuda/include', '-std=c++14', '-Wno-implicit-int-float-conversion', '-I/opt/rocm/rocblas/include', '-I/opt/rocm/miopen/include', '-I/opt/rocm/include', '-Dcub=hipcub', '-Wno-delete-abstract-non-virtual-dtor', '-mavx', '-mavx2', '-lamdhip64', '-Wno-unused-command-line-argument']
+
+skip_arg = False
+
+for i in range(len(sys.argv)):
+  if skip_arg:
+    skip_arg = False
+    continue
+  arg = sys.argv[i]
+  if arg == '-o':
+    skip_arg = True
+    args.extend(['-o', sys.argv[i + 1]])
+  elif (arg.startswith('/') and (arg.endswith('.cpp') or arg.endswith('.cu'))) or arg.startswith('-I/'):
+    args.append(arg)
+
+os.execl('/opt/rocm/bin/hipcc', '/opt/rocm/bin/hipcc', *args)
+

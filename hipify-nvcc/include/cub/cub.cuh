@@ -1,0 +1,1 @@
+#include <hipcub/hipcub.hpp>
