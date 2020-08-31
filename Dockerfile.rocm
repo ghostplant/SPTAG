@@ -22,4 +22,5 @@ COPY Test ./Test/
 COPY Wrappers ./Wrappers/
 COPY GPUSupport ./GPUSupport/
 
+RUN /bin/echo -n 'gfx900\ngfx906\ngfx908' > /opt/rocm/bin/target.lst
 RUN mkdir build && cd build && cmake .. && make -j && cd ..
